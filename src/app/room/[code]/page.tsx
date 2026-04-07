@@ -1,6 +1,5 @@
 "use client";
 
-import PusherClient from 'pusher-js';
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiAction, getPlayerId } from "@/lib/api";
@@ -35,35 +34,34 @@ export default function RoomPage() {
     setLocalPlayerId(playerId);
 
 
-    const fetchRoom = () => {
-      apiAction("getRoomState", { roomCode: code }).then((res: any) => {
-        if (res.success) {
-          setRoom((prev: any) => {
-            if (JSON.stringify(prev) === JSON.stringify(res.room)) return prev;
-            return res.room;
-          });
-        } else if (res.error === 'Room not found') {
-          router.push("/");
-        }
-      });
+    apiAction("getRoomState", { roomCode: code }).then((res: any) => {
+      if (res.success) {
+        setRoom(res.room);
+      } else {
+        router.push("/");
+      }
+    });
+
+    const eventSource = new EventSource(`/api/stream?code=${code}&playerId=${playerId}`);
+    
+    eventSource.onmessage = (event) => {
+      const data = event.data;
+      if (data && data !== ':') {
+        const newRoom = JSON.parse(data);
+        setRoom((prev: any) => {
+          if (JSON.stringify(prev) === JSON.stringify(newRoom)) return prev;
+          return newRoom;
+        });
+      }
     };
 
-    fetchRoom();
-
-    // Setup Pusher Client for real-time WebSockets
-    const pusher = new PusherClient(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-    });
-
-    const channel = pusher.subscribe(`room-${code.toUpperCase()}`);
-    channel.bind("update", () => {
-      // Whenever the backend notifies us of an update, fetch the latest state
-      fetchRoom();
-    });
+    eventSource.onerror = () => {
+      // Stream will auto-reconnect, but if it dies completely we can just fallback to polling or let it reconnect
+      console.log("SSE Connection Error. Attempting to reconnect...");
+    };
 
     return () => {
-      pusher.unsubscribe(`room-${code.toUpperCase()}`);
-      pusher.disconnect();
+      eventSource.close();
     };
   }, [code, router]);
 
@@ -176,7 +174,8 @@ export default function RoomPage() {
                 {isHost && (
                   <button 
                     onClick={() => apiAction("addBot", { roomCode: code })}
-                    className="px-4 py-2 text-xs font-black text-cyan-950 uppercase tracking-widest bg-cyan-400 hover:bg-cyan-300 rounded-xl transition-colors shadow-[0_0_15px_rgba(34,211,238,0.4)]"
+                    disabled={room.players.length >= 8}
+                    className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-colors shadow-[0_0_15px_rgba(34,211,238,0.4)] ${room.players.length >= 8 ? 'bg-zinc-700 text-zinc-500 cursor-not-allowed shadow-none' : 'bg-cyan-400 hover:bg-cyan-300 text-cyan-950'}`}
                   >
                     + Add Bot
                   </button>

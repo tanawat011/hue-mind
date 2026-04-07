@@ -1,9 +1,9 @@
 import { getRoom } from './roomManager';
-import { saveRoomToRedis } from './store';
+import { broadcastRoom } from './store';
 import { Room, Coordinate, Settings } from './types';
 
-export async function startGame(roomCode: string, settings: Settings = {}) {
-  const room = await getRoom(roomCode);
+export function startGame(roomCode: string, settings: Settings = {}) {
+  const room = getRoom(roomCode);
   if (!room) return;
 
   room.settings = settings;
@@ -12,7 +12,6 @@ export async function startGame(roomCode: string, settings: Settings = {}) {
     return { error: 'Need at least 2 players to start!' };
   }
 
-  // Reset scores and set up initial game state
   room.players.forEach(p => p.score = 0);
   
   room.state = 'PLAYING';
@@ -26,17 +25,18 @@ export async function startGame(roomCode: string, settings: Settings = {}) {
     phase: 'CLUE_PHASE',
   };
 
-  await startNewTurn(room);
+  startNewTurn(room);
   return room;
 }
 
 function clearPhaseTimer(room: Room) {
-  if (room.gameState) {
-    room.gameState.turnDeadline = null;
+  if (room.timerId) {
+    clearTimeout(room.timerId);
+    room.timerId = undefined;
   }
 }
 
-function setPhaseTimer(room: Room) {
+function setPhaseTimer(room: Room, callback: () => void) {
   clearPhaseTimer(room);
   if (!room.settings || !room.settings.useTimer) return;
   
@@ -44,9 +44,14 @@ function setPhaseTimer(room: Room) {
   if(room.gameState) {
     room.gameState.turnDeadline = Date.now() + durationMs;
   }
+  
+  room.timerId = setTimeout(() => {
+    room.timerId = undefined;
+    callback();
+  }, durationMs);
 }
 
-export async function startNewTurn(room: Room) {
+export function startNewTurn(room: Room) {
   if (!room.gameState) return;
 
   const currentGiver = room.players[room.gameState.currentTurnIndex];
@@ -61,17 +66,32 @@ export async function startNewTurn(room: Room) {
   }));
   
   room.gameState.targetColor = null;
-  
   room.gameState.clue = null;
   room.gameState.guesses = {};
   room.gameState.phase = 'CLUE_PHASE';
   
-  setPhaseTimer(room);
-  await saveRoomToRedis(room.code, room);
+  setPhaseTimer(room, () => {
+    if (room.gameState && room.gameState.phase === 'CLUE_PHASE') {
+      room.gameState.clue = "TIMEOUT";
+      room.gameState.phase = 'SCORE_PHASE';
+      broadcastRoom(room.code);
+    }
+  });
+
+  if (currentGiver.isBot) {
+    setTimeout(() => {
+      const adjectives = ["Warm", "Cold", "Bright", "Dark", "Neon", "Pastel", "Deep", "Soft", "Vibrant", "Ocean", "Sunset", "Forest", "Earth"];
+      const clue = adjectives[Math.floor(Math.random() * adjectives.length)];
+      const chosenIndex = Math.floor(Math.random() * 4);
+      submitClue(room.code, currentGiver.id, clue, chosenIndex);
+    }, 2000);
+  }
+
+  broadcastRoom(room.code);
 }
 
-export async function submitClue(roomCode: string, playerId: string, clue: string, targetChoiceIndex: number = 0) {
-  const room = await getRoom(roomCode);
+export function submitClue(roomCode: string, playerId: string, clue: string, targetChoiceIndex: number = 0) {
+  const room = getRoom(roomCode);
   if (!room || room.state !== 'PLAYING' || !room.gameState) return { error: 'Game not running' };
   
   const currentGiver = room.players[room.gameState.currentTurnIndex];
@@ -84,14 +104,43 @@ export async function submitClue(roomCode: string, playerId: string, clue: strin
   room.gameState.clue = clue;
   room.gameState.phase = 'GUESS_PHASE';
   
-  setPhaseTimer(room);
-  await saveRoomToRedis(room.code, room);
+  setPhaseTimer(room, () => {
+    if (room.gameState && room.gameState.phase === 'GUESS_PHASE') {
+      calculateScoresAndNextPhase(room);
+    }
+  });
 
+  const botsToGuess = room.players.filter(p => p.isBot && p.id !== currentGiver.id);
+  botsToGuess.forEach(bot => {
+    setTimeout(() => {
+      let gx=0, gy=0;
+      const target = room.gameState?.targetColor;
+      if(target) {
+          let maxDist = 5;
+          if (room.settings?.botDifficulty === 'Easy') maxDist = 12;
+          else if (room.settings?.botDifficulty === 'Medium') maxDist = 6;
+          else if (room.settings?.botDifficulty === 'Hard') maxDist = 2;
+          else if (room.settings?.botDifficulty === 'Very Hard') maxDist = 1;
+          
+          let dx = Math.floor(Math.random() * (maxDist * 2 + 1)) - maxDist;
+          let dy = Math.floor(Math.random() * (maxDist * 2 + 1)) - maxDist;
+          
+          const xMax = room.settings?.boardSize?.x || 30;
+          const yMax = room.settings?.boardSize?.y || 16;
+          
+          gx = Math.max(0, Math.min(xMax - 1, target.x + dx));
+          gy = Math.max(0, Math.min(yMax - 1, target.y + dy));
+      }
+      submitGuess(roomCode, bot.id, { x: gx, y: gy });
+    }, 1500 + Math.random() * 2000);
+  });
+
+  broadcastRoom(room.code);
   return { success: true, room };
 }
 
-export async function submitGuess(roomCode: string, playerId: string, guessLocation: Coordinate) {
-  const room = await getRoom(roomCode);
+export function submitGuess(roomCode: string, playerId: string, guessLocation: Coordinate) {
+  const room = getRoom(roomCode);
   if (!room || room.state !== 'PLAYING' || !room.gameState) return { error: 'Game not running' };
 
   const currentGiver = room.players[room.gameState.currentTurnIndex];
@@ -105,23 +154,21 @@ export async function submitGuess(roomCode: string, playerId: string, guessLocat
     if (duplicate) return { error: 'Color already guessed' };
   }
 
-  // Only one guess allowed per player in our simple version
   room.gameState.guesses[playerId] = guessLocation; 
 
-  // Check if everyone has guessed
   const guessersCount = room.players.length - 1;
   const currentGuesses = Object.keys(room.gameState.guesses).length;
 
   if (currentGuesses >= guessersCount) {
-    await calculateScoresAndNextPhase(room);
+    calculateScoresAndNextPhase(room);
   } else {
-    await saveRoomToRedis(room.code, room);
+    broadcastRoom(room.code);
   }
 
   return { success: true, room };
 }
 
-export async function calculateScoresAndNextPhase(room: Room) {
+function calculateScoresAndNextPhase(room: Room) {
   if (!room.gameState) return;
   
   clearPhaseTimer(room);
@@ -152,11 +199,11 @@ export async function calculateScoresAndNextPhase(room: Room) {
   });
 
   currentGiver.score += giverPoints;
-  await saveRoomToRedis(room.code, room);
+  broadcastRoom(room.code);
 }
 
-export async function nextTurn(roomCode: string) {
-  const room = await getRoom(roomCode);
+export function nextTurn(roomCode: string) {
+  const room = getRoom(roomCode);
   if (!room || room.state !== 'PLAYING' || !room.gameState) return { error: 'Game not running' };
   if (room.gameState.phase !== 'SCORE_PHASE') return { error: 'Current turn not finished' };
 
@@ -169,16 +216,16 @@ export async function nextTurn(roomCode: string) {
 
   if (room.gameState.round > room.gameState.maxRounds) {
     room.state = 'FINISHED';
-    await saveRoomToRedis(room.code, room);
+    broadcastRoom(room.code);
   } else {
-    await startNewTurn(room);
+    startNewTurn(room);
   }
 
   return { success: true, room };
 }
 
-export async function returnToLobby(roomCode: string) {
-  const room = await getRoom(roomCode);
+export function returnToLobby(roomCode: string) {
+  const room = getRoom(roomCode);
   if (!room) return { error: 'Room not found' };
   
   clearPhaseTimer(room);
@@ -187,78 +234,6 @@ export async function returnToLobby(roomCode: string) {
     p.score = 0;
   });
   room.gameState = null;
-  await saveRoomToRedis(room.code, room);
+  broadcastRoom(room.code);
   return { success: true, room };
-}
-
-// Tick function to be called on polling GET /api/action getRoomState
-// This replaces setTimeout for bots and timers
-export async function processRoomTick(roomCode: string) {
-  const room = await getRoom(roomCode);
-  if (!room || room.state !== 'PLAYING' || !room.gameState) return room;
-
-  const gameState = room.gameState;
-  const currentGiver = room.players[gameState.currentTurnIndex];
-  if (!currentGiver) return room;
-
-  let stateChanged = false;
-
-  // Process Timeouts
-  if (gameState.turnDeadline && Date.now() > gameState.turnDeadline) {
-    if (gameState.phase === 'CLUE_PHASE') {
-      gameState.clue = "TIMEOUT";
-      gameState.phase = 'SCORE_PHASE';
-      stateChanged = true;
-    } else if (gameState.phase === 'GUESS_PHASE') {
-      await calculateScoresAndNextPhase(room); // Saves internally
-      return await getRoom(roomCode);
-    }
-  }
-
-  // Process Bots
-  if (gameState.phase === 'CLUE_PHASE' && currentGiver.isBot) {
-    const adjectives = ["Warm", "Cold", "Bright", "Dark", "Neon", "Pastel", "Deep", "Soft", "Vibrant", "Ocean", "Sunset", "Forest", "Earth"];
-    const clue = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const chosenIndex = Math.floor(Math.random() * 4);
-    
-    // Auto-play immediately on tick
-    await submitClue(room.code, currentGiver.id, clue, chosenIndex);
-    return await getRoom(roomCode);
-  }
-
-  if (gameState.phase === 'GUESS_PHASE') {
-    const botsToGuess = room.players.filter(p => p.isBot && p.id !== currentGiver.id && !gameState.guesses[p.id]);
-    
-    if (botsToGuess.length > 0) {
-      // Just guess immediately for all bots for simplicity in serverless
-      for (const bot of botsToGuess) {
-        let gx=0, gy=0;
-        const target = gameState.targetColor;
-        if(target) {
-            let maxDist = 5;
-            if (room.settings?.botDifficulty === 'Easy') maxDist = 12;
-            else if (room.settings?.botDifficulty === 'Medium') maxDist = 6;
-            else if (room.settings?.botDifficulty === 'Hard') maxDist = 2;
-            else if (room.settings?.botDifficulty === 'Very Hard') maxDist = 1;
-            
-            let dx = Math.floor(Math.random() * (maxDist * 2 + 1)) - maxDist;
-            let dy = Math.floor(Math.random() * (maxDist * 2 + 1)) - maxDist;
-            
-            const xMax = room.settings?.boardSize?.x || 30;
-            const yMax = room.settings?.boardSize?.y || 16;
-
-            gx = Math.max(0, Math.min(xMax - 1, target.x + dx));
-            gy = Math.max(0, Math.min(yMax - 1, target.y + dy));
-        }
-        await submitGuess(room.code, bot.id, { x: gx, y: gy });
-      }
-      return await getRoom(roomCode);
-    }
-  }
-
-  if (stateChanged) {
-     await saveRoomToRedis(room.code, room);
-  }
-
-  return room;
 }

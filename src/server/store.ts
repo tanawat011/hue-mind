@@ -1,44 +1,33 @@
 import { Room } from './types';
-import { Redis } from '@upstash/redis';
 
-export const redis = new Redis({
-  url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
+// Global memory for rooms. Fast and synchronous!
+const globalAny: any = global;
 
-const ROOM_PREFIX = "room:";
-
-export async function getRoomFromRedis(code: string): Promise<Room | undefined> {
-  if (!code) return undefined;
-  const room = await redis.get<Room>(ROOM_PREFIX + code.toUpperCase());
-  return room || undefined;
+if (!globalAny.gameRooms) {
+  globalAny.gameRooms = new Map<string, Room>();
+}
+if (!globalAny.roomStreams) {
+  globalAny.roomStreams = new Map<string, Set<ReadableStreamDefaultController>>();
 }
 
-import { pusherServer } from './pusher';
+export const gameRooms = globalAny.gameRooms as Map<string, Room>;
+export const roomStreams = globalAny.roomStreams as Map<string, Set<ReadableStreamDefaultController>>;
 
-export async function saveRoomToRedis(code: string, room: Room): Promise<void> {
-  if (!code || !room) return;
-  // Expire rooms after 24 hours to keep Redis clean (86400 seconds)
-  await redis.set(ROOM_PREFIX + code.toUpperCase(), room, { ex: 86400 });
-  
-  // Trigger a room update via Pusher
-  pusherServer.trigger(`room-${code.toUpperCase()}`, "update", { timestamp: Date.now() }).catch(console.error);
-}
+// Broadcast a room state to all connected SSE clients
+export function broadcastRoom(roomCode: string) {
+  const room = gameRooms.get(roomCode);
+  if (!room) return;
 
-export async function deleteRoomFromRedis(code: string): Promise<void> {
-  if (!code) return;
-  await redis.del(ROOM_PREFIX + code.toUpperCase());
-}
-
-export async function getAllRooms(): Promise<[string, Room][]> {
-  const keys = await redis.keys(ROOM_PREFIX + "*");
-  if (keys.length === 0) return [];
-  const rooms = await redis.mget<Room[]>(...keys);
-  
-  const result: [string, Room][] = [];
-  keys.forEach((key, index) => {
-    const r = rooms[index];
-    if (r) result.push([key.replace(ROOM_PREFIX, ""), r]);
-  });
-  return result;
+  const streams = roomStreams.get(roomCode);
+  if (streams) {
+    const data = `data: ${JSON.stringify(room)}\n\n`;
+    streams.forEach(controller => {
+      try {
+        controller.enqueue(new TextEncoder().encode(data));
+      } catch (e) {
+        // If stream is closed or errored, remove it
+        streams.delete(controller);
+      }
+    });
+  }
 }

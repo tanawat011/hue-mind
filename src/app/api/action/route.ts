@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createRoom, joinRoom, addBotToRoom, getRoom, sendChat } from "../../../server/roomManager";
-import { startGame, submitClue, submitGuess, nextTurn, returnToLobby, processRoomTick } from "../../../server/gameLogic";
+import { startGame, submitClue, submitGuess, nextTurn, returnToLobby } from "../../../server/gameLogic";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -11,8 +11,8 @@ export async function POST(request: NextRequest) {
   switch (action) {
     case 'createRoom': {
       const { password, playerName, playerId } = payload;
-      const roomCode = await createRoom(password);
-      result = await joinRoom(roomCode, password, { id: playerId, name: playerName });
+      const roomCode = createRoom(password);
+      result = joinRoom(roomCode, password, { id: playerId, name: playerName });
       if (result.success) {
         result.roomCode = roomCode;
       }
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
     case 'joinRoom': {
       const { code, password, playerName, playerId } = payload;
-      result = await joinRoom(code.toUpperCase(), password, { id: playerId, name: playerName });
+      result = joinRoom(code.toUpperCase(), password, { id: playerId, name: playerName });
       if (result.success) {
         result.roomCode = result.room.code;
       }
@@ -28,12 +28,12 @@ export async function POST(request: NextRequest) {
     }
     case 'addBot': {
       const { roomCode } = payload;
-      result = await addBotToRoom(roomCode);
+      result = addBotToRoom(roomCode);
       break;
     }
     case 'startGame': {
       const { roomCode, settings } = payload;
-      const room = await startGame(roomCode, settings);
+      const room = startGame(roomCode, settings);
       if (room && !('error' in room)) {
         result = { success: true, room };
       } else {
@@ -43,44 +43,40 @@ export async function POST(request: NextRequest) {
     }
     case 'submitClue': {
       const { roomCode, playerId, clue, targetChoiceIndex } = payload;
-      result = await submitClue(roomCode, playerId, clue, targetChoiceIndex);
+      result = submitClue(roomCode, playerId, clue, targetChoiceIndex);
       break;
     }
     case 'submitGuess': {
       const { roomCode, playerId, guessLocation } = payload;
-      result = await submitGuess(roomCode, playerId, guessLocation);
+      result = submitGuess(roomCode, playerId, guessLocation);
       break;
     }
     case 'nextTurn': {
       const { roomCode } = payload;
-      result = await nextTurn(roomCode);
+      result = nextTurn(roomCode);
       break;
     }
     case 'returnToLobby': {
       const { roomCode } = payload;
-      result = await returnToLobby(roomCode);
+      result = returnToLobby(roomCode);
       break;
     }
     case 'sendChat': {
       const { roomCode, playerId, message } = payload;
-      result = await sendChat(roomCode, playerId, message);
+      result = sendChat(roomCode, playerId, message);
       break;
     }
     case 'getRoomState': {
       const { roomCode } = payload;
-      const processedRoom = await processRoomTick(roomCode);
-      
-      if (processedRoom) {
-        result = { success: true, room: processedRoom };
+      const room = getRoom(roomCode);
+      if (room) {
+        result = { success: true, room };
       } else {
         result = { error: 'Room not found' };
       }
       break;
     }
   }
-
-  // With KV & Polling, we don't manually broadcast. The client fetches
-  // updated state via polling `getRoomState`.
 
   return NextResponse.json(result);
 }
