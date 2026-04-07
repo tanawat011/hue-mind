@@ -16,6 +16,15 @@ export default function MainMenu() {
   useEffect(() => {
     const savedName = localStorage.getItem("hueMindAlias");
     if (savedName) setName(savedName);
+    
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const codeParam = urlParams.get('code');
+      if (codeParam) {
+        setRoomCode(codeParam.toUpperCase());
+        setError("Please enter your name and click Join to enter the room!");
+      }
+    }
   }, []);
 
   const handleAction = async (mode: 'create'|'join') => {

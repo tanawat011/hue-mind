@@ -36,6 +36,11 @@ export default function RoomPage() {
 
     apiAction("getRoomState", { roomCode: code }).then((res: any) => {
       if (res.success) {
+        const isPlayerInRoom = res.room.players.some((p: any) => p.id === playerId);
+        if (!isPlayerInRoom) {
+          router.push(`/?code=${code}`);
+          return;
+        }
         setRoom(res.room);
       } else {
         router.push("/");
