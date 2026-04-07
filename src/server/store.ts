@@ -2,8 +2,8 @@ import { Room } from './types';
 import { Redis } from '@upstash/redis';
 
 export const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN!,
 });
 
 const ROOM_PREFIX = "room:";
@@ -14,10 +14,15 @@ export async function getRoomFromRedis(code: string): Promise<Room | undefined> 
   return room || undefined;
 }
 
+import { pusherServer } from './pusher';
+
 export async function saveRoomToRedis(code: string, room: Room): Promise<void> {
   if (!code || !room) return;
   // Expire rooms after 24 hours to keep Redis clean (86400 seconds)
   await redis.set(ROOM_PREFIX + code.toUpperCase(), room, { ex: 86400 });
+  
+  // Trigger a room update via Pusher
+  pusherServer.trigger(`room-${code.toUpperCase()}`, "update", { timestamp: Date.now() }).catch(console.error);
 }
 
 export async function deleteRoomFromRedis(code: string): Promise<void> {

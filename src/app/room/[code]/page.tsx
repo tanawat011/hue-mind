@@ -1,5 +1,6 @@
 "use client";
 
+import PusherClient from 'pusher-js';
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiAction, getPlayerId } from "@/lib/api";
@@ -33,10 +34,14 @@ export default function RoomPage() {
     }
     setLocalPlayerId(playerId);
 
+
     const fetchRoom = () => {
       apiAction("getRoomState", { roomCode: code }).then((res: any) => {
         if (res.success) {
-          setRoom(res.room);
+          setRoom((prev: any) => {
+            if (JSON.stringify(prev) === JSON.stringify(res.room)) return prev;
+            return res.room;
+          });
         } else if (res.error === 'Room not found') {
           router.push("/");
         }
@@ -44,10 +49,21 @@ export default function RoomPage() {
     };
 
     fetchRoom();
-    const intervalId = setInterval(fetchRoom, 1500);
+
+    // Setup Pusher Client for real-time WebSockets
+    const pusher = new PusherClient(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    });
+
+    const channel = pusher.subscribe(`room-${code.toUpperCase()}`);
+    channel.bind("update", () => {
+      // Whenever the backend notifies us of an update, fetch the latest state
+      fetchRoom();
+    });
 
     return () => {
-      clearInterval(intervalId);
+      pusher.unsubscribe(`room-${code.toUpperCase()}`);
+      pusher.disconnect();
     };
   }, [code, router]);
 
