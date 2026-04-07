@@ -33,25 +33,21 @@ export default function RoomPage() {
     }
     setLocalPlayerId(playerId);
 
-    apiAction("getRoomState", { roomCode: code }).then((res: any) => {
-      if (res.success) {
-        setRoom(res.room);
-      } else {
-        router.push("/");
-      }
-    });
-
-    const eventSource = new EventSource(`/api/stream?code=${code}&playerId=${playerId}`);
-    
-    eventSource.onmessage = (event) => {
-      const data = event.data;
-      if (data && data !== ':') {
-        setRoom(JSON.parse(data));
-      }
+    const fetchRoom = () => {
+      apiAction("getRoomState", { roomCode: code }).then((res: any) => {
+        if (res.success) {
+          setRoom(res.room);
+        } else if (res.error === 'Room not found') {
+          router.push("/");
+        }
+      });
     };
 
+    fetchRoom();
+    const intervalId = setInterval(fetchRoom, 1500);
+
     return () => {
-      eventSource.close();
+      clearInterval(intervalId);
     };
   }, [code, router]);
 

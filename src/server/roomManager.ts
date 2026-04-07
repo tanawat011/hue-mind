@@ -1,7 +1,5 @@
-import { rooms as storeRooms } from './store';
+import { getRoomFromRedis, saveRoomToRedis, deleteRoomFromRedis, getAllRooms } from './store';
 import { Room, Player } from './types';
-
-export const rooms = storeRooms;
 
 function generateRoomCode(): string {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -12,10 +10,13 @@ function generateRoomCode(): string {
   return result;
 }
 
-export function createRoom(password: string | null = null): string {
+export async function createRoom(password: string | null = null): Promise<string> {
   let roomCode = generateRoomCode();
-  while (rooms.has(roomCode)) {
+  let existingRoom = await getRoomFromRedis(roomCode);
+  
+  while (existingRoom) {
     roomCode = generateRoomCode();
+    existingRoom = await getRoomFromRedis(roomCode);
   }
 
   const room: Room = {
@@ -27,16 +28,16 @@ export function createRoom(password: string | null = null): string {
     chat: []
   };
 
-  rooms.set(roomCode, room);
+  await saveRoomToRedis(roomCode, room);
   return roomCode;
 }
 
-export function getRoom(code: string): Room | undefined {
-  return rooms.get(code);
+export async function getRoom(code: string): Promise<Room | undefined> {
+  return await getRoomFromRedis(code);
 }
 
-export function joinRoom(code: string, password: string | null, player: Omit<Player, 'isHost' | 'score'>) {
-  const room = rooms.get(code);
+export async function joinRoom(code: string, password: string | null, player: Omit<Player, 'isHost' | 'score'>) {
+  const room = await getRoomFromRedis(code);
   if (!room) return { error: 'Room not found' };
   
   if (room.password && room.password !== password) {
@@ -57,12 +58,14 @@ export function joinRoom(code: string, password: string | null, player: Omit<Pla
   // check if player is already in room (should not happen, but safeguard)
   if (!room.players.find(p => p.id === player.id)) {
       room.players.push(newPlayer);
+      await saveRoomToRedis(code, room);
   }
+  
   return { success: true, room, newPlayer };
 }
 
-export function sendChat(code: string, playerId: string, message: string) {
-  const room = rooms.get(code);
+export async function sendChat(code: string, playerId: string, message: string) {
+  const room = await getRoomFromRedis(code);
   if (!room) return { error: 'Room not found' };
   
   if (!room.chat) room.chat = [];
@@ -81,11 +84,12 @@ export function sendChat(code: string, playerId: string, message: string) {
     room.chat.shift(); // Keep only last 50 messages
   }
   
+  await saveRoomToRedis(code, room);
   return { success: true };
 }
 
-export function leaveRoom(code: string, playerId: string) {
-  const room = rooms.get(code);
+export async function leaveRoom(code: string, playerId: string) {
+  const room = await getRoomFromRedis(code);
   if (!room) return null;
 
   const playerIndex = room.players.findIndex(p => p.id === playerId);
@@ -95,23 +99,26 @@ export function leaveRoom(code: string, playerId: string) {
     
     // If room is empty, delete it
     if (room.players.length === 0) {
-      rooms.delete(code);
+      await deleteRoomFromRedis(code);
       return { code, deleted: true };
-    } else if (isHost) {
-      // Reassign host
-      if (room.players[0]) {
+    } else {
+      if (isHost && room.players[0]) {
+        // Reassign host
         room.players[0].isHost = true;
       }
+      await saveRoomToRedis(code, room);
     }
   }
   return { code, room };
 }
 
-export function removePlayerFromAllRooms(playerId: string) {
+export async function removePlayerFromAllRooms(playerId: string) {
   const leftRooms: Array<{code: string; room?: Room; deleted?: boolean}> = [];
-  for (const [code, room] of rooms.entries()) {
+  const allRooms = await getAllRooms();
+  
+  for (const [code, room] of allRooms) {
     if (room.players.some(p => p.id === playerId)) {
-      const updateDetails = leaveRoom(code, playerId);
+      const updateDetails = await leaveRoom(code, playerId);
       if (updateDetails) {
         leftRooms.push(updateDetails);
       }
@@ -120,8 +127,8 @@ export function removePlayerFromAllRooms(playerId: string) {
   return leftRooms;
 }
 
-export function addBotToRoom(code: string) {
-  const room = rooms.get(code);
+export async function addBotToRoom(code: string) {
+  const room = await getRoomFromRedis(code);
   if (!room) return { error: 'Room not found' };
   if (room.state !== 'LOBBY') return { error: 'Game already in progress' };
   if (room.players.length >= 8) return { error: 'Room is full' };
@@ -139,5 +146,6 @@ export function addBotToRoom(code: string) {
   };
   
   room.players.push(newBot);
+  await saveRoomToRedis(code, room);
   return { success: true, room };
 }
