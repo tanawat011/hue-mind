@@ -21,7 +21,8 @@ export function createRoom(password = null) {
     password: password,
     players: [], // { id, name, score, isHost }
     state: 'LOBBY', // LOBBY, PLAYING, FINISHED
-    gameState: null
+    gameState: null,
+    chat: []
   };
 
   rooms.set(roomCode, room);
@@ -56,6 +57,29 @@ export function joinRoom(code, password, player) {
       room.players.push(newPlayer);
   }
   return { success: true, room, newPlayer };
+}
+
+export function sendChat(code, playerId, message) {
+  const room = rooms.get(code);
+  if (!room) return { error: 'Room not found' };
+  
+  if (!room.chat) room.chat = [];
+  
+  const player = room.players.find(p => p.id === playerId);
+  const name = player ? player.name : (playerId === 'system' ? 'System' : 'Unknown');
+  
+  room.chat.push({
+    playerId,
+    name,
+    message,
+    timestamp: Date.now()
+  });
+  
+  if (room.chat.length > 50) {
+    room.chat.shift(); // Keep only last 50 messages
+  }
+  
+  return { success: true };
 }
 
 export function leaveRoom(code, playerId) {

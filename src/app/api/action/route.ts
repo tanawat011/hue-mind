@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRoom, joinRoom, addBotToRoom, getRoom } from "../../../server/roomManager.js";
+import { createRoom, joinRoom, addBotToRoom, getRoom, sendChat } from "../../../server/roomManager.js";
 import { startGame, submitClue, submitGuess, nextTurn, returnToLobby } from "../../../server/gameLogic.js";
 import { broadcastRoom } from "../../../server/store.js";
 
@@ -84,6 +84,15 @@ export async function POST(request: NextRequest) {
     case 'returnToLobby': {
       const { roomCode } = payload;
       result = returnToLobby(roomCode);
+      if (result.success) {
+        shouldBroadcast = true;
+        broadcastCode = roomCode;
+      }
+      break;
+    }
+    case 'sendChat': {
+      const { roomCode, playerId, message } = payload;
+      result = sendChat(roomCode, playerId, message);
       if (result.success) {
         shouldBroadcast = true;
         broadcastCode = roomCode;

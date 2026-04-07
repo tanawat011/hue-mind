@@ -2,13 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Palette, Moon, Sun, MonitorPlay } from "lucide-react";
+import { MonitorPlay } from "lucide-react";
 import { apiAction, getPlayerId } from "@/lib/api";
-import { useTheme } from "@/components/ThemeProvider";
 
 export default function MainMenu() {
   const router = useRouter();
-  const { theme, toggleTheme } = useTheme();
   
   const [name, setName] = useState("");
   const [roomCode, setRoomCode] = useState("");
@@ -45,99 +43,143 @@ export default function MainMenu() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-zinc-50 dark:bg-zinc-950 transition-colors duration-500 p-4">
+    <div className="relative flex min-h-screen items-center justify-center overflow-x-hidden bg-[#050505] p-4 sm:p-6 text-zinc-100 font-sans selection:bg-cyan-500/30">
       
-      {/* Background gradients */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-fuchsia-500/20 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-cyan-500/20 blur-[120px] pointer-events-none" />
-
-      {/* Theme Toggle */}
-      <button 
-        onClick={toggleTheme} 
-        className="absolute top-6 right-6 p-3 rounded-full bg-white/10 dark:bg-black/10 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 hover:scale-105 transition-all z-50 text-zinc-700 dark:text-zinc-300 shadow-sm"
-      >
-        {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
-      </button>
-
-      {/* Main Card */}
-      <div className="w-full max-w-md p-8 rounded-3xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-2xl relative z-10 transition-all duration-300 hover:shadow-cyan-500/5">
+      {/* Cyberpunk Grid Background EXACTLY matching Lobby */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_0%,#000_70%,transparent_100%)]" />
         
-        <div className="flex flex-col items-center mb-8 text-center">
-          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl overflow-hidden shadow-2xl mb-6 shadow-cyan-500/30 border border-white/20 hover:scale-105 transition-all">
-            <img src="/logo.png" alt="HueMind Logo" className="w-full h-full object-cover" />
+        {/* Background neon bokeh orbs from Lobby */}
+        {/* Top Left Group */}
+        <div className="fixed top-[-10%] left-[-5%] w-[400px] h-[400px] rounded-full bg-[#00e5ff] opacity-[0.25] blur-[30px] mix-blend-screen pointer-events-none" />
+        <div className="fixed top-[5%] left-[8%] w-[180px] h-[180px] rounded-full bg-[#00e5ff] opacity-[0.6] blur-[15px] mix-blend-screen pointer-events-none" />
+        <div className="fixed top-[20%] left-[2%] w-[100px] h-[100px] rounded-full bg-[#ff00a0] opacity-[0.8] blur-[8px] mix-blend-screen pointer-events-none" />
+        <div className="fixed top-[35%] left-[12%] w-[120px] h-[120px] rounded-full bg-[#0044ff] opacity-[0.7] blur-[12px] mix-blend-screen pointer-events-none" />
+        <div className="fixed top-[15%] left-[22%] w-[80px] h-[80px] rounded-full bg-[#ff00a0] opacity-[0.9] blur-[6px] mix-blend-screen pointer-events-none" />
+
+        {/* Top Center-Right Group */}
+        <div className="fixed top-[12%] right-[25%] w-[140px] h-[140px] rounded-full bg-[#ff00ff] opacity-[0.85] blur-[12px] mix-blend-screen pointer-events-none" />
+        <div className="fixed top-[-5%] right-[5%] w-[450px] h-[450px] rounded-full bg-[#0044ff] opacity-[0.4] blur-[35px] mix-blend-screen pointer-events-none" />
+        <div className="fixed top-[20%] right-[8%] w-[90px] h-[90px] rounded-full bg-[#00e5ff] opacity-[0.9] blur-[8px] mix-blend-screen pointer-events-none" />
+        <div className="fixed top-[32%] right-[18%] w-[110px] h-[110px] rounded-full bg-[#ff00a0] opacity-[0.8] blur-[10px] mix-blend-screen pointer-events-none" />
+
+        {/* Middle Group */}
+        <div className="fixed top-[45%] right-[12%] w-[180px] h-[180px] rounded-full bg-[#00e5ff] opacity-[0.6] blur-[15px] mix-blend-screen pointer-events-none" />
+        <div className="fixed top-[55%] left-[5%] w-[140px] h-[140px] rounded-full bg-[#ff00ff] opacity-[0.7] blur-[12px] mix-blend-screen pointer-events-none" />
+        
+        {/* Bottom Left Group (Cyan Ring & Scatter) */}
+        <div className="fixed bottom-[-15%] left-[-15%] w-[700px] h-[700px] rounded-full border-[60px] border-[#00e5ff] opacity-[0.5] blur-[25px] mix-blend-screen pointer-events-none" />
+        <div className="fixed bottom-[15%] left-[20%] w-[100px] h-[100px] rounded-full bg-[#ff00a0] opacity-[0.8] blur-[8px] mix-blend-screen pointer-events-none" />
+        <div className="fixed bottom-[8%] left-[8%] w-[150px] h-[150px] rounded-full bg-[#00e5ff] opacity-[0.7] blur-[12px] mix-blend-screen pointer-events-none" />
+        <div className="fixed bottom-[30%] left-[12%] w-[80px] h-[80px] rounded-full bg-[#ff00ff] opacity-[0.9] blur-[5px] mix-blend-screen pointer-events-none" />
+
+        {/* Bottom Right Group (Magenta Ring & Scatter) */}
+        <div className="fixed bottom-[-20%] right-[-10%] w-[800px] h-[800px] rounded-full border-[80px] border-[#ff00a0] opacity-[0.5] blur-[30px] mix-blend-screen pointer-events-none" />
+        <div className="fixed bottom-[20%] right-[28%] w-[120px] h-[120px] rounded-full bg-[#00e5ff] opacity-[0.9] blur-[10px] mix-blend-screen pointer-events-none z-0" />
+        <div className="fixed bottom-[8%] right-[15%] w-[90px] h-[90px] rounded-full bg-[#ff00ff] opacity-[0.85] blur-[6px] mix-blend-screen pointer-events-none z-0" />
+        <div className="fixed bottom-[35%] right-[5%] w-[140px] h-[140px] rounded-full bg-[#0044ff] opacity-[0.7] blur-[12px] mix-blend-screen pointer-events-none z-0" />
+        
+        {/* Center Bottom Sub-layer */}
+        <div className="fixed bottom-[-5%] left-[40%] w-[400px] h-[400px] rounded-full bg-[#7000ff] opacity-[0.35] blur-[35px] mix-blend-screen pointer-events-none" />
+        <div className="fixed bottom-[15%] left-[45%] w-[90px] h-[90px] rounded-full bg-[#ff00a0] opacity-[0.8] blur-[8px] mix-blend-screen pointer-events-none" />
+      </div>
+
+      {/* Main Glassmorphic Card (Matching the Lobby Card) */}
+      <div className="w-full max-w-[420px] bg-white/[0.02] backdrop-blur-3xl border border-white/10 rounded-[32px] overflow-hidden shadow-[0_0_60px_rgba(0,0,0,0.5)] relative z-10">
+        
+        {/* Inner glow line exactly like Lobby */}
+        <div className="absolute top-0 inset-x-0 h-px bg-linear-to-r from-transparent via-cyan-500/50 to-transparent opacity-50" />
+        
+        <div className="p-8 sm:p-10">
+          
+          <div className="flex flex-col items-center mb-8 text-center">
+            <div className="w-28 h-28 rounded-3xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.5)] mb-6 border border-white/10 hover:scale-105 transition-transform duration-300">
+              <img src="/logo.png" alt="HueMind Logo" className="w-full h-full object-cover" />
+            </div>
+            {/* Same text gradient as GameBoard "HUES & CUES" logo */}
+            <h1 className="text-4xl font-black italic tracking-widest text-transparent bg-clip-text bg-linear-to-br from-white via-zinc-200 to-zinc-500 drop-shadow-lg uppercase">
+              Hue<span className="text-transparent bg-clip-text bg-linear-to-br from-cyan-400 to-fuchsia-500">Mind</span>
+            </h1>
+            <p className="mt-2 text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold">
+              Neural Grid Protocol
+            </p>
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-fuchsia-600 to-cyan-500">
-            HueMind
-          </h1>
-          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            A real-time multiplayer color guessing game.
-          </p>
-        </div>
 
-        {error && (
-          <div className="mb-4 p-3 rounded-xl bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-sm font-medium text-center border border-red-200 dark:border-red-500/20">
-            {error}
-          </div>
-        )}
+          {error && (
+            <div className="mb-6 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-wider text-center flex items-center justify-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              {error}
+            </div>
+          )}
 
-        <div className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1 ml-1">
-              Your Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setError("");
-              }}
-              className="w-full px-5 py-3 rounded-2xl bg-white/50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
-              placeholder="Enter your alias"
-              maxLength={16}
-            />
-          </div>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="block text-[10px] uppercase tracking-wider text-zinc-400 font-bold ml-1">
+                Your Alias
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError("");
+                }}
+                className="w-full bg-black/40 text-sm text-white px-5 py-4 rounded-xl border border-white/10 focus:outline-none focus:border-cyan-500 focus:bg-white/5 transition-all font-bold tracking-wider placeholder:text-zinc-600/80 placeholder:font-medium"
+                placeholder="Enter Display Name"
+                maxLength={16}
+              />
+            </div>
 
-          <div className="h-px w-full bg-gradient-to-r from-transparent via-zinc-200 dark:via-zinc-800 to-transparent my-6" />
+            <div className="h-px w-full bg-linear-to-r from-transparent via-white/10 to-transparent my-2" />
 
-          <button
-            onClick={() => handleAction('create')}
-            disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all focus:ring-2 focus:ring-zinc-900/20 active:scale-[0.98] disabled:opacity-50"
-          >
-            <MonitorPlay size={18} />
-            {isLoading ? "Connecting..." : "Create New Room"}
-          </button>
-
-          <div className="relative flex items-center justify-center my-6">
-            <div className="absolute inset-x-0 h-px bg-zinc-200 dark:bg-zinc-800" />
-            <span className="relative px-4 text-xs font-medium uppercase tracking-wider text-zinc-400 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md rounded-full">
-              Or join existing
-            </span>
-          </div>
-
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={roomCode}
-              onChange={(e) => {
-                setRoomCode(e.target.value.toUpperCase());
-                setError("");
-              }}
-              className="flex-1 px-5 py-3 rounded-2xl bg-white/50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/50 transition-all font-bold text-center tracking-widest text-zinc-900 dark:text-zinc-100 placeholder:font-normal placeholder:tracking-normal placeholder:text-zinc-400 uppercase"
-              placeholder="CODE"
-              maxLength={4}
-            />
             <button
-              onClick={() => handleAction('join')}
-              disabled={isLoading || roomCode.length !== 4}
-              className="px-6 py-3 rounded-2xl bg-fuchsia-500 hover:bg-fuchsia-600 text-white font-semibold transition-all focus:ring-2 focus:ring-fuchsia-500/50 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
+              onClick={() => handleAction('create')}
+              disabled={isLoading}
+              className="w-full relative group overflow-hidden rounded-xl p-[1px] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
             >
-              Join
+              <div className="absolute inset-0 bg-linear-to-r from-cyan-500 to-fuchsia-500 rounded-xl opacity-70 group-hover:opacity-100 blur-sm transition-opacity duration-300" />
+              <div className="relative flex items-center justify-center gap-3 bg-zinc-950 px-6 py-4 rounded-xl transition-colors group-hover:bg-zinc-900/90">
+                <MonitorPlay className="w-5 h-5 text-cyan-400 group-hover:text-white transition-colors" />
+                <span className="font-black text-white tracking-[0.2em] uppercase text-xs sm:text-sm drop-shadow-md">
+                  {isLoading ? "BOOTING..." : "CREATE ROOM"}
+                </span>
+              </div>
             </button>
+
+            <div className="relative flex items-center justify-center py-2">
+               <div className="absolute inset-x-0 h-px bg-white/5" />
+               <span className="relative px-4 text-[10px] font-bold uppercase tracking-widest text-zinc-500 bg-[#050505] border border-white/5 rounded-full py-1">
+                 Join Link
+               </span>
+            </div>
+
+            <div className="flex w-full gap-2 overflow-hidden">
+              <input
+                type="text"
+                value={roomCode}
+                onChange={(e) => {
+                  setRoomCode(e.target.value.toUpperCase());
+                  setError("");
+                }}
+                className="flex-1 min-w-0 border-box bg-black/40 text-lg text-center font-black tracking-[0.2em] text-white px-2 sm:px-4 py-4 rounded-xl border border-white/10 focus:outline-none focus:border-fuchsia-500 focus:bg-white/5 transition-all placeholder:font-medium placeholder:tracking-widest placeholder:text-zinc-600/80 placeholder:text-xs sm:placeholder:text-sm uppercase"
+                placeholder="CODE"
+                maxLength={4}
+              />
+              <button
+                onClick={() => handleAction('join')}
+                disabled={isLoading || roomCode.length !== 4}
+                className="relative group overflow-hidden rounded-xl p-px transition-all hover:scale-[1.05] active:scale-[0.95] disabled:opacity-50 disabled:pointer-events-none shrink-0"
+              >
+                <div className="absolute inset-0 bg-fuchsia-500 rounded-xl opacity-80 group-hover:opacity-100 blur-sm transition-opacity duration-300" />
+                <div className="relative flex items-center justify-center h-full bg-zinc-950 px-4 sm:px-6 rounded-xl transition-colors group-hover:bg-zinc-900/90">
+                  <span className="font-black text-white tracking-[0.1em] uppercase text-xs sm:text-sm drop-shadow-md">
+                    JOIN
+                  </span>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
-
       </div>
     </div>
   );

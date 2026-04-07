@@ -143,7 +143,7 @@ function calculateScoresAndNextPhase(room) {
   const target = room.gameState.targetColor;
   const currentGiver = room.players[room.gameState.currentTurnIndex];
   
-  let anyoneGuessedCorrectly = false; // Just to reward the giver slightly if it was a good clue
+  let giverPoints = 0;
 
   Object.entries(room.gameState.guesses).forEach(([pid, guess]) => {
     // Calculate Chebyshev distance (max of x dist and y dist)
@@ -156,18 +156,17 @@ function calculateScoresAndNextPhase(room) {
 
     if (distance === 0) {
       player.score += 3;
-      anyoneGuessedCorrectly = true;
+      giverPoints += 1; // Giver gets 1pt for guess inside 3x3
     } else if (distance === 1) {
       player.score += 2;
+      giverPoints += 1; // Giver gets 1pt for guess inside 3x3
     } else if (distance === 2) {
       player.score += 1;
     }
   });
 
-  // Small reward for good clue
-  if (anyoneGuessedCorrectly) {
-    currentGiver.score += 1;
-  }
+  // Giver gets points for each accurate guess
+  currentGiver.score += giverPoints;
 }
 
 export function nextTurn(roomCode) {
@@ -261,6 +260,28 @@ function processBotActions(room) {
                 if (dup) valid = false;
              }
              attempts++;
+           }
+           
+           // Fallback: If area is completely crowded (e.g. corner square on Very Hard), scan board for closest free square
+           if (!valid) {
+             let minScore = Infinity;
+             for (let x = 0; x < xMax; x++) {
+               for (let y = 0; y < yMax; y++) {
+                 let isDup = false;
+                 if (room.settings && !room.settings.allowDuplicateGuesses) {
+                   isDup = Object.values(room.gameState.guesses).some(g => g.x === x && g.y === y);
+                 }
+                 if (!isDup) {
+                   const dist = Math.abs(x - target.x) + Math.abs(y - target.y);
+                   const score = dist + Math.random() * 2; // Add slight randomness
+                   if (score < minScore) {
+                     minScore = score;
+                     gx = x;
+                     gy = y;
+                   }
+                 }
+               }
+             }
            }
            
            submitGuess(room.code, bot.id, { x: gx, y: gy });
