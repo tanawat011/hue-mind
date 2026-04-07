@@ -1,72 +1,64 @@
+# 🎨 HueMind
+
+> **HueMind** is a cyberpunk-themed, real-time multiplayer board game inspired by _Hues and Cues_. Connect players, give color hints, and guess your way perfectly onto the neon spectrum!
+
 <div align="center">
-  <img src="public/opengraph-image.png" alt="HueMind Cyberpunk Board Game" width="100%" style="border-radius:20px; box-shadow: 0 0 40px rgba(232,121,249,0.3)"/>
+  <img src="public/screenshot-1-landing.png" alt="HueMind Landing Page" />
+  <br/>
+  <i>Step 1: Create or join a room from the neural hub.</i>
+  <br/><br/>
+  <img src="public/screenshot-2-lobby.png" alt="HueMind Lobby" />
+  <br/>
+  <i>Step 2: Gather in the lobby with friends and configure AI bots.</i>
+  <br/><br/>
+  <img src="public/screenshot-3-gameplay.png" alt="HueMind Gameplay" />
+  <br/>
+  <i>Step 3: Dive into the neon spectrum and start guessing!</i>
 </div>
 
-<h1 align="center" style="color: #e879f9; text-transform: uppercase; letter-spacing: 0.2em; font-weight: 900;">HUE MIND 🧠</h1>
+## 📌 Features (v1.1.0)
 
-<p align="center">
-  <em>Decode the spectrum. Read their minds. Win the grid.</em><br>
-  A high-fidelity, cyberpunk-themed implementation of the classic color-guessing board game.
-</p>
+- 🔥 **Real-Time Multiplayer**: Built with pure Next.js 15, React 19, and Tailwind CSS v4 running state synchronizations via Server-Sent Events (SSE).
+- 🤖 **AI-Bot Integration**: Play against deterministic, intelligent bots that adapt to the clues and crowd the scoring zones perfectly.
+- 💬 **Live Game Chat**: Chat with host, players, and bots seamlessly during matches! Fully isolated from the game board to ensure zero typing lag.
+- 🏆 **Dynamic Shared Ranking**: Leaderboards update in real-time, matching "tied" players with identical neon badging using competitive dense-ranking mechanics.
+- ⚡ **God-Tier Performance**: Hardened React Client Rendering (memoization on the massive 480-cell game board) ensuring 60 FPS input across all devices.
+- 🎯 **Chebyshev Scoring Logic**: Mathematically accurate scoring identical to the authentic board game. Give a clue and earn +1 for every player who lands within your 3x3 zone!
+## 🎮 How to Play
 
----
+HueMind tests your ability to connect words to colors. The game loops through players, where everyone takes turns being the "Giver".
 
-## ⚡ ABOUT THE GAME
+1. **Clue Phase**: The Giver secretly sees 4 target colors. They select one and type a short word or phrase (e.g., "Apple", "Cold water", "Cyberpunk") to describe it.
+2. **Guess Phase**: All other players race against the clock to drop their pin on the 480-color grid, guessing the exact shade the Giver is trying to describe.
+3. **Score Phase**: A 3x3 and 5x5 scoring grid bursts onto the board centered on the actual Target Color. 
+   - **Guessers** earn +2 points for landing in the inner white square, and +1 point for landing in the outer expanded square.
+   - **The Giver** earns +1 point for EVERY player that lands anywhere within the scoring zones! (Maximum of 8 points).
 
-**HueMind** is a multiplayer deductive game set in a futuristic neural-grid aesthetic. Players take turns acting as the **"Clue Giver"**, providing a 1-to-2 word clue representing a specific color tile on a massive chromodynamic grid. The rest of the players are **"Guessers"**, dropping locators onto the board to hone in on the target.
+## 🚀 Getting Started
 
-With brutal Server-Authoritative timers, competitive scoring mechanics, and a strict 8-player room capacity, HueMind pushes color-theory intuition to its absolute limits.
-
-## 🔥 GOD-TIER FEATURES
-
-* 🎨 **Cyberpunk Glassmorphism UI**: High-impact visuals using pure CSS dropshadows, backdrop filters, and neon gradients (Fuchsia & Cyan).
-* ⏱️ **Adrenaline Timer System**: Configurable host timeouts (15s to 60s) with auto-forfeiture to speed up game flow.
-* 🤖 **Deterministic AI Avatars**: Automatic non-colliding avatar assignment for up to 8 real or AI participants. Advanced pathfinding logic for 4 bot difficulties (*Easy* to *Very Hard*).
-* 📡 **Zero-Latency State Sync**: Powered by Server-Sent Events (SSE) instead of bloated WebSockets, enabling instant state propagation.
-* 📱 **Flawless Mobile Engine**: Responsive horizontally-scrolling player rosters and fluid phase-action button bars constructed specifically for mobile vertical orientations.
-
-## 🛠️ THE ARCHITECTURE
-
-HueMind is meticulously engineered to squeeze maximum performance out of the modern web stack.
-
-* **Framework**: [Next.js 15 (App Router)](https://nextjs.org/)
-* **Runtime**: [Bun](https://bun.sh/)
-* **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
-* **State Delivery**: Server-Sent Events (SSE) API Endpoints
-* **Assets**: In-browser vector computations combined with `.webp`/`.png` static deliverables.
-
----
-
-## 🚀 BOOTUP SEQUENCE (LOCAL DEV)
-
-Ensure your system is running `Bun` or `Node.js >= 18`.
+### 1. Install Dependencies
 
 ```bash
-# 1. Install dependencies footprint
-npm install
-# or
 bun install
-
-# 2. Boot the Next.js development server
-npm run dev
-# or 
-bun run dev
-
-# 3. Access the Mainframe
-# Open http://localhost:3000
 ```
 
-## 🎮 HOSTING A MATCH
-1. Hit **CREATE ROOM**.
-2. Customize the Room Settings inside the Lobby:
-   * **Grid Size**: *Very Small (10x6)* up to *Large (30x16)*
-   * **Bot Difficulty**: How sharp the AI perceives colors.
-   * **Turn Timer**: Enable for strict deadlines (15s - 60s).
-   * **Rounds**: From a 1-Round sprint to a 10-Round marathon.
-3. Share the `ROOM CODE` with friends. (Bots can be injected to fill empty slots!).
-4. Click **START MATCH** and connect back to the grid.
+### 2. Start the Development Server
 
----
-<p align="center">
-  System Architecture Finalized. Awaiting Operator Input... 🟦🟪
-</p>
+```bash
+bun run dev
+```
+
+### 3. Play!
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result. Create a room and share the 4-letter Room Code with your friends (or just add bots to test!).
+
+## 🏗️ Technical Stack
+
+- **Framework:** Next.js 15 App Router
+- **Runtime:** Node / Bun
+- **Styling:** Tailwind CSS v4
+- **State Management:** Backend memory persistence synced via high-performance SSE streaming.
+
+## 📝 License
+
+This project was built for educational and entertainment purposes. It is heavily inspired by the actual board game "Hues and Cues". Not affiliated with the Op Games.

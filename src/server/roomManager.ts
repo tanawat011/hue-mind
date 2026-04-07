@@ -1,7 +1,9 @@
-import { rooms as storeRooms } from './store.js';
+import { rooms as storeRooms } from './store';
+import { Room, Player } from './types';
+
 export const rooms = storeRooms;
 
-function generateRoomCode() {
+function generateRoomCode(): string {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   let result = '';
   for (let i = 0; i < 4; i++) {
@@ -10,17 +12,17 @@ function generateRoomCode() {
   return result;
 }
 
-export function createRoom(password = null) {
+export function createRoom(password: string | null = null): string {
   let roomCode = generateRoomCode();
   while (rooms.has(roomCode)) {
     roomCode = generateRoomCode();
   }
 
-  const room = {
+  const room: Room = {
     code: roomCode,
     password: password,
-    players: [], // { id, name, score, isHost }
-    state: 'LOBBY', // LOBBY, PLAYING, FINISHED
+    players: [],
+    state: 'LOBBY',
     gameState: null,
     chat: []
   };
@@ -29,11 +31,11 @@ export function createRoom(password = null) {
   return roomCode;
 }
 
-export function getRoom(code) {
+export function getRoom(code: string): Room | undefined {
   return rooms.get(code);
 }
 
-export function joinRoom(code, password, player) {
+export function joinRoom(code: string, password: string | null, player: Omit<Player, 'isHost' | 'score'>) {
   const room = rooms.get(code);
   if (!room) return { error: 'Room not found' };
   
@@ -50,7 +52,7 @@ export function joinRoom(code, password, player) {
   }
 
   const isHost = room.players.length === 0;
-  const newPlayer = { ...player, isHost, score: 0 };
+  const newPlayer: Player = { ...player, isHost, score: 0 };
   
   // check if player is already in room (should not happen, but safeguard)
   if (!room.players.find(p => p.id === player.id)) {
@@ -59,7 +61,7 @@ export function joinRoom(code, password, player) {
   return { success: true, room, newPlayer };
 }
 
-export function sendChat(code, playerId, message) {
+export function sendChat(code: string, playerId: string, message: string) {
   const room = rooms.get(code);
   if (!room) return { error: 'Room not found' };
   
@@ -82,7 +84,7 @@ export function sendChat(code, playerId, message) {
   return { success: true };
 }
 
-export function leaveRoom(code, playerId) {
+export function leaveRoom(code: string, playerId: string) {
   const room = rooms.get(code);
   if (!room) return null;
 
@@ -97,14 +99,16 @@ export function leaveRoom(code, playerId) {
       return { code, deleted: true };
     } else if (isHost) {
       // Reassign host
-      room.players[0].isHost = true;
+      if (room.players[0]) {
+        room.players[0].isHost = true;
+      }
     }
   }
   return { code, room };
 }
 
-export function removePlayerFromAllRooms(playerId) {
-  const leftRooms = [];
+export function removePlayerFromAllRooms(playerId: string) {
+  const leftRooms: Array<{code: string; room?: Room; deleted?: boolean}> = [];
   for (const [code, room] of rooms.entries()) {
     if (room.players.some(p => p.id === playerId)) {
       const updateDetails = leaveRoom(code, playerId);
@@ -116,7 +120,7 @@ export function removePlayerFromAllRooms(playerId) {
   return leftRooms;
 }
 
-export function addBotToRoom(code) {
+export function addBotToRoom(code: string) {
   const room = rooms.get(code);
   if (!room) return { error: 'Room not found' };
   if (room.state !== 'LOBBY') return { error: 'Game already in progress' };
@@ -126,7 +130,7 @@ export function addBotToRoom(code) {
   const botName = `Bot ${botCount + 1}`;
   const botId = `bot-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   
-  const newBot = { 
+  const newBot: Player = { 
     id: botId, 
     name: botName, 
     score: 0, 

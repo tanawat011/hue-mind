@@ -1,7 +1,9 @@
-import { getRoom } from './roomManager.js';
-import { broadcastRoom } from './store.js';
+import { getRoom } from './roomManager';
+import { broadcastRoom } from './store';
+import { Room, Coordinate, Settings } from './types';
+// We'll import submitGuess/submitClue definitions here too or just use them from module
 
-export function startGame(roomCode, settings = {}) {
+export function startGame(roomCode: string, settings: Settings = {}) {
   const room = getRoom(roomCode);
   if (!room) return;
 
@@ -29,7 +31,7 @@ export function startGame(roomCode, settings = {}) {
   return room;
 }
 
-function clearPhaseTimer(room) {
+function clearPhaseTimer(room: Room) {
   if (room.timerId) {
     clearTimeout(room.timerId);
     room.timerId = null;
@@ -39,23 +41,26 @@ function clearPhaseTimer(room) {
   }
 }
 
-function setPhaseTimer(room, timeoutCallback) {
+function setPhaseTimer(room: Room, timeoutCallback: (room: Room) => void) {
   clearPhaseTimer(room);
   if (!room.settings || !room.settings.useTimer) return;
   
   const durationMs = (room.settings.timerDuration || 30) * 1000;
-  room.gameState.turnDeadline = Date.now() + durationMs;
+  if(room.gameState) {
+    room.gameState.turnDeadline = Date.now() + durationMs;
+  }
   
   room.timerId = setTimeout(() => {
     timeoutCallback(room);
   }, durationMs);
 }
 
-export function startNewTurn(room) {
+export function startNewTurn(room: Room) {
+  if (!room.gameState) return;
+
   const currentGiver = room.players[room.gameState.currentTurnIndex];
+  if (!currentGiver) return;
   
-  // Generate random target color coordinate (assuming 30x16 grid: x: 0-29, y: 0-15)
-  // For simplicity we will use an x,y coordinate system.
   const xMax = room.settings?.boardSize?.x || 30;
   const yMax = room.settings?.boardSize?.y || 16;
   
@@ -81,15 +86,17 @@ export function startNewTurn(room) {
   processBotActions(room);
 }
 
-export function submitClue(roomCode, playerId, clue, targetChoiceIndex = 0) {
+export function submitClue(roomCode: string, playerId: string, clue: string, targetChoiceIndex: number = 0) {
   const room = getRoom(roomCode);
-  if (!room || room.state !== 'PLAYING') return { error: 'Game not running' };
+  if (!room || room.state !== 'PLAYING' || !room.gameState) return { error: 'Game not running' };
   
   const currentGiver = room.players[room.gameState.currentTurnIndex];
-  if (currentGiver.id !== playerId) return { error: 'Not your turn to give a clue' };
+  if (!currentGiver || currentGiver.id !== playerId) return { error: 'Not your turn to give a clue' };
   if (room.gameState.phase !== 'CLUE_PHASE') return { error: 'Not the clue phase' };
 
-  room.gameState.targetColor = room.gameState.targetChoices[targetChoiceIndex];
+  if(room.gameState.targetChoices) {
+    room.gameState.targetColor = room.gameState.targetChoices[targetChoiceIndex];
+  }
   room.gameState.clue = clue;
   room.gameState.phase = 'GUESS_PHASE';
   
@@ -105,12 +112,12 @@ export function submitClue(roomCode, playerId, clue, targetChoiceIndex = 0) {
   return { success: true, room };
 }
 
-export function submitGuess(roomCode, playerId, guessLocation) {
+export function submitGuess(roomCode: string, playerId: string, guessLocation: Coordinate) {
   const room = getRoom(roomCode);
-  if (!room || room.state !== 'PLAYING') return { error: 'Game not running' };
+  if (!room || room.state !== 'PLAYING' || !room.gameState) return { error: 'Game not running' };
 
   const currentGiver = room.players[room.gameState.currentTurnIndex];
-  if (currentGiver.id === playerId) return { error: 'Clue giver cannot guess' };
+  if (!currentGiver || currentGiver.id === playerId) return { error: 'Clue giver cannot guess' };
   if (room.gameState.phase !== 'GUESS_PHASE') return { error: 'Not the guess phase' };
 
   if (room.settings && !room.settings.allowDuplicateGuesses) {
@@ -121,7 +128,7 @@ export function submitGuess(roomCode, playerId, guessLocation) {
   }
 
   // Only one guess allowed per player in our simple version
-  room.gameState.guesses[playerId] = guessLocation; // { x, y }
+  room.gameState.guesses[playerId] = guessLocation; 
 
   // Check if everyone has guessed
   const guessersCount = room.players.length - 1;
@@ -137,16 +144,18 @@ export function submitGuess(roomCode, playerId, guessLocation) {
   return { success: true, room };
 }
 
-function calculateScoresAndNextPhase(room) {
+function calculateScoresAndNextPhase(room: Room) {
+  if (!room.gameState) return;
+  
   clearPhaseTimer(room);
   room.gameState.phase = 'SCORE_PHASE';
   const target = room.gameState.targetColor;
   const currentGiver = room.players[room.gameState.currentTurnIndex];
+  if (!target || !currentGiver) return;
   
   let giverPoints = 0;
 
   Object.entries(room.gameState.guesses).forEach(([pid, guess]) => {
-    // Calculate Chebyshev distance (max of x dist and y dist)
     const dx = Math.abs(guess.x - target.x);
     const dy = Math.abs(guess.y - target.y);
     const distance = Math.max(dx, dy);
@@ -156,33 +165,30 @@ function calculateScoresAndNextPhase(room) {
 
     if (distance === 0) {
       player.score += 3;
-      giverPoints += 1; // Giver gets 1pt for guess inside 3x3
+      giverPoints += 1; 
     } else if (distance === 1) {
       player.score += 2;
-      giverPoints += 1; // Giver gets 1pt for guess inside 3x3
+      giverPoints += 1; 
     } else if (distance === 2) {
       player.score += 1;
     }
   });
 
-  // Giver gets points for each accurate guess
   currentGiver.score += giverPoints;
 }
 
-export function nextTurn(roomCode) {
+export function nextTurn(roomCode: string) {
   const room = getRoom(roomCode);
-  if (!room || room.state !== 'PLAYING') return { error: 'Game not running' };
+  if (!room || room.state !== 'PLAYING' || !room.gameState) return { error: 'Game not running' };
   if (room.gameState.phase !== 'SCORE_PHASE') return { error: 'Current turn not finished' };
 
   room.gameState.currentTurnIndex++;
   
-  // Check if all players have gone this round
   if (room.gameState.currentTurnIndex >= room.players.length) {
     room.gameState.currentTurnIndex = 0;
     room.gameState.round++;
   }
 
-  // Check if game is over
   if (room.gameState.round > room.gameState.maxRounds) {
     room.state = 'FINISHED';
   } else {
@@ -192,7 +198,7 @@ export function nextTurn(roomCode) {
   return { success: true, room };
 }
 
-export function returnToLobby(roomCode) {
+export function returnToLobby(roomCode: string) {
   const room = getRoom(roomCode);
   if (!room) return { error: 'Room not found' };
   
@@ -206,11 +212,12 @@ export function returnToLobby(roomCode) {
 }
 
 // Bot AI routines
-function processBotActions(room) {
-  if (room.state !== 'PLAYING') return;
+function processBotActions(room: Room) {
+  if (room.state !== 'PLAYING' || !room.gameState) return;
 
   const gameState = room.gameState;
   const currentGiver = room.players[gameState.currentTurnIndex];
+  if (!currentGiver) return;
 
   if (gameState.phase === 'CLUE_PHASE' && currentGiver.isBot) {
     const adjectives = ["Warm", "Cold", "Bright", "Dark", "Neon", "Pastel", "Deep", "Soft", "Vibrant", "Ocean", "Sunset", "Forest", "Earth"];
@@ -219,7 +226,7 @@ function processBotActions(room) {
     
     setTimeout(() => {
       // Validate still valid phase and player
-      if (room.gameState.phase === 'CLUE_PHASE' && room.players[room.gameState.currentTurnIndex].id === currentGiver.id) {
+      if (room.gameState && room.gameState.phase === 'CLUE_PHASE' && room.players[room.gameState.currentTurnIndex]?.id === currentGiver.id) {
          submitClue(room.code, currentGiver.id, clue, chosenIndex);
          broadcastRoom(room);
       }
@@ -231,10 +238,11 @@ function processBotActions(room) {
     
     botsToGuess.forEach(bot => {
       setTimeout(() => {
-        if (room.gameState.phase === 'GUESS_PHASE' && !room.gameState.guesses[bot.id]) {
+        if (room.gameState && room.gameState.phase === 'GUESS_PHASE' && !room.gameState.guesses[bot.id]) {
            const target = room.gameState.targetColor;
-           let gx, gy;
+           if(!target) return;
            
+           let gx=0, gy=0;
            let maxDist = 5;
            if (room.settings?.botDifficulty === 'Easy') maxDist = 12;
            else if (room.settings?.botDifficulty === 'Medium') maxDist = 6;
@@ -262,7 +270,6 @@ function processBotActions(room) {
              attempts++;
            }
            
-           // Fallback: If area is completely crowded (e.g. corner square on Very Hard), scan board for closest free square
            if (!valid) {
              let minScore = Infinity;
              for (let x = 0; x < xMax; x++) {
@@ -273,7 +280,7 @@ function processBotActions(room) {
                  }
                  if (!isDup) {
                    const dist = Math.abs(x - target.x) + Math.abs(y - target.y);
-                   const score = dist + Math.random() * 2; // Add slight randomness
+                   const score = dist + Math.random() * 2;
                    if (score < minScore) {
                      minScore = score;
                      gx = x;
@@ -287,8 +294,7 @@ function processBotActions(room) {
            submitGuess(room.code, bot.id, { x: gx, y: gy });
            broadcastRoom(room);
         }
-      }, 1000 + Math.random() * 3000); // 1 to 4s delay
+      }, 1000 + Math.random() * 3000);
     });
   }
 }
-

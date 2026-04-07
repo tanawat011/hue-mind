@@ -1,6 +1,7 @@
-import { getRoom } from './roomManager.js';
+import { getRoom } from './roomManager';
+import { ChatMessage } from './types';
 
-export function sendChat(code, playerId, message) {
+export function sendChat(code: string, playerId: string, message: string) {
   const room = getRoom(code);
   if (!room) return { error: 'Room not found' };
   
@@ -9,12 +10,14 @@ export function sendChat(code, playerId, message) {
   const player = room.players.find(p => p.id === playerId);
   const name = player ? player.name : 'Unknown';
   
-  room.chat.push({
+  const chatMessage: ChatMessage = {
     playerId,
     name,
     message,
     timestamp: Date.now()
-  });
+  };
+  
+  room.chat.push(chatMessage);
   
   if (room.chat.length > 50) {
     room.chat.shift(); // Keep only last 50 messages

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { clients } from "../../../server/store.js";
+import { clients } from "../../../server/store";
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       
       let roomListeners = clients.get(code);
       if (!roomListeners) {
-        roomListeners = new Set();
+        roomListeners = new Set<{ id: string; controller: ReadableStreamDefaultController }>();
         clients.set(code, roomListeners);
       }
       
