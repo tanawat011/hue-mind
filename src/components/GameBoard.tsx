@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { apiAction } from "@/lib/api";
 import { Users, MessageSquare, ScrollText, Clock } from "lucide-react";
 
@@ -113,6 +113,140 @@ export function GameBoard({ room, localPlayerId }: GameBoardProps) {
   // Calculate tied rankings (Dense Ranking)
   const sortedPlayers = [...room.players].sort((a: any, b: any) => b.score - a.score);
   const distinctScores = Array.from(new Set(room.players.map((p: any) => p.score))).sort((a: any, b: any) => b - a) as number[];
+
+  const colorGrid = useMemo(() => {
+    return (
+      <>
+        {/* Empty top-left cell */}
+        <div style={{ gridColumn: 1, gridRow: 1 }} />
+
+        {/* Column labels (1 to 30) */}
+        {Array.from({ length: xMax }).map((_, i) => (
+          <div key={`col-${i}`} className="flex items-center justify-center text-[7px] md:text-[10px] font-bold text-white/40 pb-1" style={{ gridColumn: i + 2, gridRow: 1 }}>
+            {i + 1}
+          </div>
+        ))}
+
+        {/* Row labels (A to P) */}
+        {Array.from({ length: yMax }).map((_, i) => (
+          <div key={`row-${i}`} className="flex items-center justify-center text-[7px] md:text-[10px] font-bold text-white/40 pr-2" style={{ gridColumn: 1, gridRow: i + 2 }}>
+            {String.fromCharCode(65 + i)}
+          </div>
+        ))}
+
+        {Array.from({ length: yMax }).map((_, y) => (
+          Array.from({ length: xMax }).map((_, x) => {
+            const baseColor = getCellColor(x, y);
+            const previewTarget = iAmTarget && gameState.phase === 'CLUE_PHASE' ? gameState.targetChoices?.[selectedTargetChoice] : null;
+            const isTarget = previewTarget && previewTarget.x === x && previewTarget.y === y;
+            const isScorePhase = gameState.phase === 'SCORE_PHASE';
+            const isActualTarget = isScorePhase && gameState.targetColor?.x === x && gameState.targetColor?.y === y;
+            const guessersPlayers = Object.entries(gameState.guesses)
+              .filter(([_, g]: any) => g.x === x && g.y === y)
+              .map(([id]) => room.players.find((p: any) => p.id === id))
+              .filter(Boolean);
+            const isSelectedByMe = selectedLocation?.x === x && selectedLocation?.y === y;
+
+            return (
+              <div
+                key={`${x}-${y}`}
+                onClick={() => handleCellClick(x, y)}
+                className={`
+                     group cursor-pointer relative transition-all duration-200
+                     hover:scale-[1.8] hover:z-30 hover:brightness-125
+                     ${isTarget ? 'ring-[3px] ring-white z-20 scale-125 shadow-[0_0_20px_rgba(255,255,255,0.9)]' : ''}
+                     ${isSelectedByMe ? 'ring-[3px] ring-cyan-400 z-20 scale-125 shadow-[0_0_20px_rgba(34,211,238,0.9)]' : ''}
+                     ${isActualTarget ? 'ring-[3px] ring-fuchsia-400 z-30 scale-150 shadow-[0_0_40px_rgba(232,121,249,1)]' : ''}
+                   `}
+                style={{
+                  gridColumn: x + 2,
+                  gridRow: y + 2,
+                  backgroundColor: baseColor,
+                  borderRadius: 'max(4px, 15%)',
+                  boxShadow: `0 0 5px ${baseColor}, inset 0 0 0 1.5px rgba(255, 255, 255, 0.5), inset 0 0 10px rgba(0, 0, 0, 0.2)`,
+                  containerType: 'inline-size'
+                }}
+              >
+                {/* Coordinate Label */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
+                  <span
+                    className="font-black text-white/40 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] transition-opacity group-hover:opacity-100"
+                    style={{ fontSize: 'clamp(6px, 35cqw, 24px)' }}
+                  >
+                    {String.fromCharCode(65 + y)}{x + 1}
+                  </span>
+                </div>
+
+                {/* Guess marker avatars */}
+                {guessersPlayers.length > 0 && (
+                  <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-0.5 p-0.5 z-40 pointer-events-none">
+                    {guessersPlayers.map((p: any, i) => {
+                      const originalIndex = room.players.findIndex((player: any) => player.id === p.id);
+                      const avatarIndex = (originalIndex % 8) + 1;
+                      return (
+                        <img
+                          key={p.id || i}
+                          src={`/avatars/${avatarIndex}.png`}
+                          alt={p.name}
+                          title={p.name}
+                          className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border-[1.5px] border-white shadow-[0_0_10px_rgba(0,0,0,1)] pointer-events-auto transition-transform hover:scale-150"
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        ))}
+
+        {/* Scoring Overlays */}
+        {gameState.phase === 'SCORE_PHASE' && gameState.targetColor && (() => {
+          const tCol = gameState.targetColor.x + 2;
+          const tRow = gameState.targetColor.y + 2;
+          const b3sC = Math.max(2, tCol - 1), b3eC = Math.min(xMax + 2, tCol + 2);
+          const b3sR = Math.max(2, tRow - 1), b3eR = Math.min(yMax + 2, tRow + 2);
+          const b5sC = Math.max(2, tCol - 2), b5eC = Math.min(xMax + 2, tCol + 3);
+          const b5sR = Math.max(2, tRow - 2), b5eR = Math.min(yMax + 2, tRow + 3);
+
+          return (
+            <>
+              <div
+                className="rounded-md z-30 pointer-events-none relative transition-all duration-500"
+                style={{
+                  gridColumn: `${b5sC} / ${b5eC}`,
+                  gridRow: `${b5sR} / ${b5eR}`,
+                  background: 'rgba(34, 211, 238, 0.1)',
+                  outline: '2px dashed rgba(34, 211, 238, 0.8)',
+                  outlineOffset: '-2px',
+                  boxShadow: 'inset 0 0 15px rgba(34, 211, 238, 0.2), 0 0 15px rgba(34, 211, 238, 0.4)'
+                }}
+              >
+                <div className="absolute -top-[14px] right-2 bg-[#070b1a]/15 text-cyan-400 font-bold px-2 py-0.5 rounded-t-lg rounded-bl-lg rounded-br-none text-[9px] md:text-[10px] border border-cyan-500/50 backdrop-blur-md shadow-lg">+1</div>
+              </div>
+              <div
+                className="rounded-md z-40 pointer-events-none relative transition-all duration-500"
+                style={{
+                  gridColumn: `${b3sC} / ${b3eC}`,
+                  gridRow: `${b3sR} / ${b3eR}`,
+                  background: 'rgba(232, 121, 249, 0.15)',
+                  outline: '3.5px solid rgba(255, 255, 255, 0.95)',
+                  outlineOffset: '-3.5px',
+                  boxShadow: 'inset 0 0 20px rgba(232, 121, 249, 0.5), 0 0 30px rgba(232, 121, 249, 0.7)'
+                }}
+              >
+                <div className="absolute -top-[16px] right-4 bg-white/5 text-fuchsia-700 font-black px-2.5 md:px-3 py-0.5 rounded-t-xl rounded-bl-xl rounded-br-none text-[10px] md:text-xs tracking-wider backdrop-blur-md shadow-lg">+2</div>
+              </div>
+            </>
+          );
+        })()}
+      </>
+    );
+  }, [
+    yMax, xMax, iAmTarget, gameState.phase, gameState.targetChoices, 
+    selectedTargetChoice, gameState.targetColor, gameState.guesses, 
+    selectedLocation, room.players
+  ]);
 
   return (
     <div className="flex flex-col lg:flex-row w-full h-full lg:max-h-[90vh] gap-4 text-white pb-10 lg:pb-0">
@@ -286,129 +420,7 @@ export function GameBoard({ room, localPlayerId }: GameBoardProps) {
             }}
           >
 
-            {/* Empty top-left cell */}
-            <div style={{ gridColumn: 1, gridRow: 1 }} />
-
-            {/* Column labels (1 to 30) */}
-            {Array.from({ length: xMax }).map((_, i) => (
-              <div key={`col-${i}`} className="flex items-center justify-center text-[7px] md:text-[10px] font-bold text-white/40 pb-1" style={{ gridColumn: i + 2, gridRow: 1 }}>
-                {i + 1}
-              </div>
-            ))}
-
-            {/* Row labels (A to P) */}
-            {Array.from({ length: yMax }).map((_, i) => (
-              <div key={`row-${i}`} className="flex items-center justify-center text-[7px] md:text-[10px] font-bold text-white/40 pr-2" style={{ gridColumn: 1, gridRow: i + 2 }}>
-                {String.fromCharCode(65 + i)}
-              </div>
-            ))}
-
-            {Array.from({ length: yMax }).map((_, y) => (
-              Array.from({ length: xMax }).map((_, x) => {
-                const baseColor = getCellColor(x, y);
-                const previewTarget = iAmTarget && gameState.phase === 'CLUE_PHASE' ? gameState.targetChoices?.[selectedTargetChoice] : null;
-                const isTarget = previewTarget && previewTarget.x === x && previewTarget.y === y;
-                const isScorePhase = gameState.phase === 'SCORE_PHASE';
-                const isActualTarget = isScorePhase && gameState.targetColor?.x === x && gameState.targetColor?.y === y;
-                const guessersPlayers = Object.entries(gameState.guesses)
-                  .filter(([_, g]: any) => g.x === x && g.y === y)
-                  .map(([id]) => room.players.find((p: any) => p.id === id))
-                  .filter(Boolean);
-                const isSelectedByMe = selectedLocation?.x === x && selectedLocation?.y === y;
-
-                return (
-                  <div
-                    key={`${x}-${y}`}
-                    onClick={() => handleCellClick(x, y)}
-                    className={`
-                         group cursor-pointer relative transition-all duration-200
-                         hover:scale-[1.8] hover:z-30 hover:brightness-125
-                         ${isTarget ? 'ring-[3px] ring-white z-20 scale-125 shadow-[0_0_20px_rgba(255,255,255,0.9)]' : ''}
-                         ${isSelectedByMe ? 'ring-[3px] ring-cyan-400 z-20 scale-125 shadow-[0_0_20px_rgba(34,211,238,0.9)]' : ''}
-                         ${isActualTarget ? 'ring-[3px] ring-fuchsia-400 z-30 scale-150 shadow-[0_0_40px_rgba(232,121,249,1)]' : ''}
-                       `}
-                    style={{
-                      gridColumn: x + 2,
-                      gridRow: y + 2,
-                      backgroundColor: baseColor,
-                      borderRadius: 'max(4px, 15%)',
-                      boxShadow: `0 0 5px ${baseColor}, inset 0 0 0 1.5px rgba(255, 255, 255, 0.5), inset 0 0 10px rgba(0, 0, 0, 0.2)`,
-                      containerType: 'inline-size'
-                    }}
-                  >
-                    {/* Coordinate Label */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
-                      <span
-                        className="font-black text-white/40 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] transition-opacity group-hover:opacity-100"
-                        style={{ fontSize: 'clamp(6px, 35cqw, 24px)' }}
-                      >
-                        {String.fromCharCode(65 + y)}{x + 1}
-                      </span>
-                    </div>
-
-                    {/* Guess marker avatars */}
-                    {guessersPlayers.length > 0 && (
-                      <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-0.5 p-0.5 z-40 pointer-events-none">
-                        {guessersPlayers.map((p: any, i) => {
-                          const originalIndex = room.players.findIndex((player: any) => player.id === p.id);
-                          const avatarIndex = (originalIndex % 8) + 1;
-                          return (
-                            <img
-                              key={p.id || i}
-                              src={`/avatars/${avatarIndex}.png`}
-                              alt={p.name}
-                              title={p.name}
-                              className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border-[1.5px] border-white shadow-[0_0_10px_rgba(0,0,0,1)] pointer-events-auto transition-transform hover:scale-150"
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            ))}
-
-            {/* Scoring Overlays */}
-            {gameState.phase === 'SCORE_PHASE' && gameState.targetColor && (() => {
-              const tCol = gameState.targetColor.x + 2;
-              const tRow = gameState.targetColor.y + 2;
-              const b3sC = Math.max(2, tCol - 1), b3eC = Math.min(xMax + 2, tCol + 2);
-              const b3sR = Math.max(2, tRow - 1), b3eR = Math.min(yMax + 2, tRow + 2);
-              const b5sC = Math.max(2, tCol - 2), b5eC = Math.min(xMax + 2, tCol + 3);
-              const b5sR = Math.max(2, tRow - 2), b5eR = Math.min(yMax + 2, tRow + 3);
-
-              return (
-                <>
-                  <div
-                    className="rounded-md z-30 pointer-events-none relative transition-all duration-500"
-                    style={{
-                      gridColumn: `${b5sC} / ${b5eC}`,
-                      gridRow: `${b5sR} / ${b5eR}`,
-                      background: 'rgba(34, 211, 238, 0.1)',
-                      outline: '2px dashed rgba(34, 211, 238, 0.8)',
-                      outlineOffset: '-2px',
-                      boxShadow: 'inset 0 0 15px rgba(34, 211, 238, 0.2), 0 0 15px rgba(34, 211, 238, 0.4)'
-                    }}
-                  >
-                    <div className="absolute -top-[14px] right-2 bg-[#070b1a]/15 text-cyan-400 font-bold px-2 py-0.5 rounded-t-lg rounded-bl-lg rounded-br-none text-[9px] md:text-[10px] border border-cyan-500/50 backdrop-blur-md shadow-lg">+1</div>
-                  </div>
-                  <div
-                    className="rounded-md z-40 pointer-events-none relative transition-all duration-500"
-                    style={{
-                      gridColumn: `${b3sC} / ${b3eC}`,
-                      gridRow: `${b3sR} / ${b3eR}`,
-                      background: 'rgba(232, 121, 249, 0.15)',
-                      outline: '3.5px solid rgba(255, 255, 255, 0.95)',
-                      outlineOffset: '-3.5px',
-                      boxShadow: 'inset 0 0 20px rgba(232, 121, 249, 0.5), 0 0 30px rgba(232, 121, 249, 0.7)'
-                    }}
-                  >
-                    <div className="absolute -top-[16px] right-4 bg-white/5 text-fuchsia-700 font-black px-2.5 md:px-3 py-0.5 rounded-t-xl rounded-bl-xl rounded-br-none text-[10px] md:text-xs tracking-wider backdrop-blur-md shadow-lg">+2</div>
-                  </div>
-                </>
-              );
-            })()}
+            {colorGrid}
           </div>
         </div>
 
